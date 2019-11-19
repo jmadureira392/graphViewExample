@@ -145,12 +145,9 @@ class GraphView @JvmOverloads constructor(
     }
 
     private fun calculateConnectionPointsForBezierCurve(pointList: List<GraphPoint>) {
-        try {
-            for (i in 1 until pointList.size) {
-                conPoint1.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i - 1].yValue))
-                conPoint2.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i].yValue))
-            }
-        } catch (e: Exception) {
+        for (i in 1 until pointList.size) {
+            conPoint1.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i - 1].yValue))
+            conPoint2.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i].yValue))
         }
     }
 
