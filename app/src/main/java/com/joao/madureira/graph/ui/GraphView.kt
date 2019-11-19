@@ -160,7 +160,9 @@ class GraphView @JvmOverloads constructor(
                 drawCircle(it.xValue, it.yValue, 10f, circlePaint)
                 save()
                 rotate(10f, it.xValue, it.yValue)
-                drawText(it.value.toString(), it.xValue-20, it.yValue - 20, textPaint)
+                val xValueStep = if (it.xValue > 50) -20 else 10
+                val yValueStep = if (it.yValue > 50) -20 else 40
+                drawText(it.value.toString(), it.xValue + xValueStep, it.yValue + yValueStep, textPaint)
                 restore()
             }
             canvas.drawCircle(it.xValue, it.yValue, 10f, circlePaint)
@@ -177,10 +179,12 @@ class GraphView @JvmOverloads constructor(
     }
 
     private fun processEventDown(rawX: Float) {
+        val xValuesList = graphPointsList.map { points -> points.xValue }
+
         // find the closest X in the list
-        val closestX = graphPointsList.map { points -> points.xValue }.minBy { abs(it - rawX) }
+        val closestX = xValuesList.minBy { abs(it - rawX) }
         // find the index of the closest number
-        val index = graphPointsList.map { points -> points.xValue }.binarySearch(closestX)
+        val index = xValuesList.binarySearch(closestX)
 
         currentPoint = when {
             index > graphPointsList.size -1 -> graphPointsList[graphPointsList.size -1]
