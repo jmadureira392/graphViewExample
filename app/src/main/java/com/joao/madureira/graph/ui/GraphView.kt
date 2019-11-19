@@ -2,9 +2,12 @@ package com.joao.madureira.graph.ui
 
 import android.content.Context
 import android.graphics.*
+import android.text.TextPaint
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
 import com.joao.madureira.graph.data.model.DataPoint
+import kotlin.math.abs
 
 class GraphView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
@@ -37,7 +40,16 @@ class GraphView @JvmOverloads constructor(
         }
     }
 
+    private val textPaint by lazy {
+        TextPaint().apply {
+            color = Color.GRAY
+            textSize = 30f
+        }
+    }
+
     private var dataList = listOf<DataPoint>()
+    private var graphPointsList = listOf<GraphPoint>()
+    private var currentPoint: GraphPoint? = null
     private val conPoint1 = mutableListOf<PointF>()
     private val conPoint2 = mutableListOf<PointF>()
 
@@ -49,12 +61,12 @@ class GraphView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
 
-        val pointsList = getGraphPoints()
+        graphPointsList = getGraphPoints()
 
         canvas?.apply {
             drawAxis(this)
-            drawPaths(this, pointsList)
-            //drawCircles(this, pointsList)
+            drawPaths(this, graphPointsList)
+            drawTouchPoint(this)
         }
 
     }
@@ -78,8 +90,8 @@ class GraphView @JvmOverloads constructor(
         }
     }
 
-    private fun getGraphPoints(): List<GraphPoints> {
-        val graphPointsList = mutableListOf<GraphPoints>()
+    private fun getGraphPoints(): List<GraphPoint> {
+        val graphPointsList = mutableListOf<GraphPoint>()
 
         val startX = 0f + paddingBottom
         val startY = height.toFloat() - paddingBottom
@@ -89,37 +101,37 @@ class GraphView @JvmOverloads constructor(
         if (dataList.isNotEmpty()) {
 
             //adds the graph origin to the points list
-            graphPointsList.add(GraphPoints(startX, startY))
+            graphPointsList.add(GraphPoint(startX, startY, 0))
 
             val stepX = (endRight - startX) / dataList.size
             dataList.forEachIndexed { index, dataPoint ->
                 val xValue = startX + (index + 1) * stepX
-                val yValue = (dataPoint.value * (startY - endTop) / 100) + endTop
+                val yValue = ((100 - dataPoint.value) * (startY - endTop) / 100) + endTop
 
-                graphPointsList.add(GraphPoints(xValue, yValue))
+                graphPointsList.add(GraphPoint(xValue, yValue, dataPoint.value))
             }
         }
 
         return graphPointsList
     }
 
-    private fun drawPaths(canvas: Canvas, pointsList: List<GraphPoints>) {
+    private fun drawPaths(canvas: Canvas, pointList: List<GraphPoint>) {
 
         val startX = 0f + paddingBottom
         val startY = height.toFloat() - paddingBottom
         val endRight = width.toFloat() - paddingEnd
 
-        calculateConnectionPointsForBezierCurve(pointsList)
+        calculateConnectionPointsForBezierCurve(pointList)
 
         val pathLines = Path()
         val pathGradients = Path()
         pathLines.moveTo(startX, startY)
         pathGradients.moveTo(startX, startY)
 
-        for (i in 1 until pointsList.size) {
+        for (i in 1 until pointList.size) {
             pathLines.cubicTo(
                 conPoint1[i -1].x, conPoint1[i-1].y, conPoint2[i - 1].x, conPoint2[i - 1].y,
-                pointsList[i].xValue, pointsList[i].yValue
+                pointList[i].xValue, pointList[i].yValue
             )
         }
 
@@ -132,21 +144,51 @@ class GraphView @JvmOverloads constructor(
         canvas.drawPath(pathLines, gradientPathPaint)
     }
 
-    private fun calculateConnectionPointsForBezierCurve(pointsList: List<GraphPoints>) {
+    private fun calculateConnectionPointsForBezierCurve(pointList: List<GraphPoint>) {
         try {
-            for (i in 1 until pointsList.size) {
-                conPoint1.add(PointF((pointsList[i].xValue + pointsList[i - 1].xValue) / 2, pointsList[i - 1].yValue))
-                conPoint2.add(PointF((pointsList[i].xValue + pointsList[i - 1].xValue) / 2, pointsList[i].yValue))
+            for (i in 1 until pointList.size) {
+                conPoint1.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i - 1].yValue))
+                conPoint2.add(PointF((pointList[i].xValue + pointList[i - 1].xValue) / 2, pointList[i].yValue))
             }
         } catch (e: Exception) {
         }
     }
 
-    private fun drawCircles(canvas: Canvas, pointsList: List<GraphPoints>) {
-        pointsList.drop(1).forEach {
+    private fun drawTouchPoint(canvas: Canvas) {
+        currentPoint?.let {
+            canvas.apply {
+                drawCircle(it.xValue, it.yValue, 10f, circlePaint)
+                save()
+                rotate(10f, it.xValue, it.yValue)
+                drawText(it.value.toString(), it.xValue-20, it.yValue - 20, textPaint)
+                restore()
+            }
             canvas.drawCircle(it.xValue, it.yValue, 10f, circlePaint)
         }
     }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+
+        if(event.action == MotionEvent.ACTION_DOWN) {
+            processEventDown(event.rawX)
+        }
+
+        return true
+    }
+
+    private fun processEventDown(rawX: Float) {
+        // find the closest X in the list
+        val closestX = graphPointsList.map { points -> points.xValue }.minBy { abs(it - rawX) }
+        // find the index of the closest number
+        val index = graphPointsList.map { points -> points.xValue }.binarySearch(closestX)
+
+        currentPoint = when {
+            index > graphPointsList.size -1 -> graphPointsList[graphPointsList.size -1]
+            else -> graphPointsList[index]
+        }
+        //this will redraw the all view with the correct point
+        invalidate()
+    }
 }
 
-data class GraphPoints(val xValue: Float, val yValue: Float)
+data class GraphPoint(val xValue: Float, val yValue: Float, val value: Int)
